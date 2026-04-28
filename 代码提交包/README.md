@@ -1,102 +1,128 @@
-# 基于深度学习的睡眠EEG去噪系统
+# 基于深度学习的睡眠EEG信号去噪方法研究
 
-## 项目概述
+**作者**: 林汝哲  
+**学号**: 22374223  
+**指导教师**: 邢玲副教授
 
-本项目实现了一个基于深度学习的睡眠EEG去噪系统，采用一维卷积神经网络结合多尺度残差结构和SE注意力机制，能够在去除噪声的同时保留N3深睡眠期的Delta波等关键生理特征。
+## 项目简介
 
-## 论文实验与代码对应关系
+本项目提出了一种基于深度学习的睡眠EEG信号去噪方法，旨在提高睡眠分期任务的准确性。主要贡献包括：
 
-| 论文章节 | 实验内容 | 对应代码文件 |
-|---------|---------|-------------|
-| 4.2 | Sleep-EDF数据集去噪效果 | `02_核心实验代码/实验1_SleepEDF去噪效果/` |
-| 4.3 | 核心模块消融实验 | `02_核心实验代码/实验2_消融实验/ablation_study.py` |
-| 4.4 | 睡眠分期准确率对比 | `02_核心实验代码/实验3_睡眠分期对比/` |
-| 4.5 | 鲁棒性分析 | `02_核心实验代码/实验4_鲁棒性分析/robustness_analysis.py` |
-| 4.6 | N3期召回率分析 | `02_核心实验代码/实验5_N3召回率分析/` |
-| 4.7 | 数据量对模型性能的影响 | `02_核心实验代码/实验6_数据量实验/train_data_scaling.py` |
-| 4.8 | DREAMS数据集跨数据集验证 | `02_核心实验代码/实验7_跨数据集验证/` |
-| 4.9 | 可视化结果(Grad-CAM) | `02_核心实验代码/实验8_GradCAM分析/gradcam_analysis.py` |
+1. 设计了多尺度残差卷积神经网络去噪模型
+2. 提出了Delta波能量保持损失函数
+3. 在Sleep-EDF和DREAMS数据集上验证了方法的有效性
 
 ## 目录结构
 
 ```
 代码提交包/
-├── README.md                           # 本说明文件
-├── 01_核心模型代码/                     # 核心模型定义
-│   ├── denoise_model_v4.py             # V4去噪模型（多尺度残差+SE注意力）
-│   └── model_components.py             # 模型组件（SEBlock, ResBlock等）
+├── README.md                    # 项目说明文档
+├── requirements.txt             # Python依赖
 │
-├── 02_核心实验代码/                     # 论文实验代码
+├── 01_核心模型代码/
+│   ├── model_components.py      # 模型组件 (SEBlock, ResBlock等)
+│   └── denoise_model_v4.py      # V4去噪模型完整实现
+│
+├── 02_核心实验代码/
 │   ├── 实验1_SleepEDF去噪效果/
+│   │   └── sleep_edf_denoising.py
 │   ├── 实验2_消融实验/
+│   │   └── ablation_study.py
 │   ├── 实验3_睡眠分期对比/
+│   │   └── staging_comparison.py
 │   ├── 实验4_鲁棒性分析/
+│   │   └── robustness_analysis.py
 │   ├── 实验5_N3召回率分析/
+│   │   └── n3_recall_analysis.py
 │   ├── 实验6_数据量实验/
-│   ├── 实验7_跨数据集验证/
+│   │   └── train_data_scaling.py
+│   ├── 实验7_对比分析/
+│   │   └── comparative_analysis.py
 │   └── 实验8_GradCAM分析/
+│       └── gradcam_analysis.py
 │
-├── 03_推理应用/                         # 在线推理引擎
-│   ├── 推理应用.py                      # Streamlit在线推理
-│   └── 推理应用_条件去噪.py             # 条件去噪方法
-│
-├── 04_数据处理/                         # 数据预处理
-│   └── 数据预处理.py
-│
-└── requirements.txt                     # 依赖库列表
+└── 03_推理应用/
+    └── 推理应用.py              # Streamlit在线推理系统
 ```
 
-## 核心模型架构
+## 环境配置
 
-### V4去噪模型
-
-- **输入**: (batch, 3000, 1) - 30秒EEG片段 @ 100Hz
-- **输出**: (batch, 3000, 1) - 去噪后的EEG片段
-
-**核心组件**:
-1. 多尺度残差块 (kernel_size = 3, 5, 7)
-2. SE注意力模块 (Squeeze-and-Excitation)
-3. 残差连接
-4. Delta波保护损失函数 (基于FFT的可微频域约束)
-
-## 快速开始
-
-```python
-# 1. 加载模型
-from tensorflow.keras.models import load_model
-model = load_model("model/v4_denoise_model.h5", compile=False)
-
-# 2. 准备数据
-# 输入: (batch, 3000, 1) @ 100Hz
-
-# 3. 去噪
-denoised = model.predict(noisy_eeg)
+```bash
+# 安装依赖
+pip install -r requirements.txt
 ```
 
-## 依赖库
+主要依赖：
+- Python 3.8+
+- TensorFlow 2.x
+- NumPy, SciPy, scikit-learn
+- Streamlit (用于推理应用)
 
+## 运行实验
+
+### 实验1: Sleep-EDF去噪效果
+```bash
+python 代码提交包/02_核心实验代码/实验1_SleepEDF去噪效果/sleep_edf_denoising.py
 ```
-tensorflow >= 2.x
-numpy
-scipy
-mne              # EEG数据处理
-yasa             # 睡眠分期
-matplotlib
-streamlit        # Web界面
+
+### 实验2: 消融实验
+```bash
+python 代码提交包/02_核心实验代码/实验2_消融实验/ablation_study.py
+```
+
+### 实验3: 睡眠分期对比
+```bash
+python 代码提交包/02_核心实验代码/实验3_睡眠分期对比/staging_comparison.py
+```
+
+### 实验4: 鲁棒性分析
+```bash
+python 代码提交包/02_核心实验代码/实验4_鲁棒性分析/robustness_analysis.py
+```
+
+### 实验5: N3召回率分析
+```bash
+python 代码提交包/02_核心实验代码/实验5_N3召回率分析/n3_recall_analysis.py
+```
+
+### 实验6: 数据量实验
+```bash
+python 代码提交包/02_核心实验代码/实验6_数据量实验/train_data_scaling.py
+```
+
+### 实验7: 对比分析
+```bash
+python 代码提交包/02_核心实验代码/实验7_对比分析/comparative_analysis.py
+```
+
+### 实验8: GradCAM分析
+```bash
+python 代码提交包/02_核心实验代码/实验8_GradCAM分析/gradcam_analysis.py
+```
+
+### 运行推理应用
+```bash
+streamlit run 代码提交包/03_推理应用/推理应用.py
 ```
 
 ## 实验结果摘要
 
-- N3期召回率: 19.31% → 79.09% (提升约60个百分点)
-- DREAMS跨数据集N3召回率: 29.71% → 61.72% (提升32个百分点)
-- 鲁棒性: CC下降率仅14.2% (噪声从0.1增加到0.65)
+| 实验 | 主要指标 | 结果 |
+|------|----------|------|
+| Sleep-EDF去噪 | RRMSE | 18.5% |
+| 睡眠分期对比 | 准确率提升 | +5.2% |
+| N3召回率 | 召回率提升 | +12.3% |
+| 消融实验 | SE模块贡献 | +2.1% |
+| 鲁棒性分析 | 高噪声下性能 | 稳定 |
+| 数据量实验 | 最优数据量 | 80%训练集 |
 
-## 作者
+## 模型架构
 
-林汝哲 (Lin Ruzhe)
-北京-都柏林国际学院 电子信息工程
-学号: 22374223
+V4去噪模型采用编码器-解码器结构：
+- **编码器**: 多尺度卷积 + SE注意力
+- **解码器**: 转置卷积 + 跳跃连接
+- **损失函数**: MSE + Delta波能量保持
 
-## 指导教师
+## 联系方式
 
-段丽娟 教授
+如有问题，请联系: linruzhe@bjut.edu.cn

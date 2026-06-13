@@ -84,11 +84,12 @@ pip install -r requirements.txt
    ```
    项目根目录/
    ├── 03_训练模型/
-   │   ├── DeepSleepNet裁判模型.h5
-   │   ├── Baseline.h5
-   │   ├── V4_wo_SE.h5
-   │   ├── V4_Single_Scale.h5
-   │   └── V4_Complete.h5
+   │   ├── V4_Paper_Denoiser.h5         # MSR-Denoiser (论文核心模型)
+   │   ├── DeepSleepNet_SleepEDF_Raw.h5 # 睡眠分期裁判模型
+   │   ├── Baseline.h5                  # 基础1D-CNN (消融对照)
+   │   ├── V4_wo_SE.h5                  # 无SE注意力 (消融对照)
+   │   ├── V4_RealEEG_Complete.h5      # 真实EEG训练完整版
+   │   └── V4_RealEEG_wo_SE.h5         # 真实EEG训练无SE版
    ```
 
 ---
@@ -112,36 +113,41 @@ python 代码提交包/02_核心实验代码/实验1_SleepEDF去噪效果/sleep_
 
 ### 实验2: 消融实验
 
-**目的**: 独立且客观地验证本研究设计的深度学习网络中各核心模块的有效性
+**目的**: 验证MSR-Denoiser各核心模块的独立贡献
 
-**数据集**: EEGdenoiseNet (开源合成脑电数据集)
-- 提供纯净EEG信号与各类高强度伪迹（EMG/EOG）的精确叠加
-- 为定量评估模型的去噪保真度提供理想平台
+**数据集**: Sleep-EDF测试集 (SC4022 + SC4031)
+- 使用DeepSleepNet作为分期评估器
+- 每个消融变体应用于整夜记录，分期结果与专家标注对比
 
-**模型配置**:
-1. Original: 原始含噪信号 (无处理)
-2. Baseline: 基础 1D-CNN 网络
-3. V4_Complete: 本文完整网络模型 (多尺度残差 + SE注意力 + 定制损失函数)
+**模型配置 (累积叠加)**:
+1. Baseline CNN: 基础1D-CNN (无多尺度、无注意力、无跳跃连接)
+2. + Multi-scale: 添加多尺度并行卷积分支 (k=3,5,7)
+3. + SE attention: 添加SE通道注意力机制
+4. + Delta loss: 替换MSE为Delta保护+频带加权损失
+5. MSR-Denoiser (Full): 完整架构 (全部模块)
 
 **运行命令**:
 ```bash
 cd 项目根目录
-python 代码提交包/02_核心实验代码/实验2_消融实验/ablation_study.py
+python test_paper_denoiser.py
 ```
 
-**输出文件**: `05_处理结果/消融实验/ablation_results.txt`
+**输出文件**: `05_处理结果/`
 
 **实验结果 (表4.3)**:
-| 模型配置 | RRMSE (%) | CC | Delta波能量保持率 (%) |
-|---------|-----------|-----|----------------------|
-| Original | 82.65 | 0.5872 | 20.67 |
-| Baseline | 63.21 | 0.7756 | 29.11 |
-| V4_Complete | 61.16 | 0.7919 | 48.85 |
+| Configuration | CC ↑ | N3 Recall ↑ | Δ CC | Δ N3 |
+|-------------|------|-------------|------|------|
+| Baseline CNN | 0.72 | 42.1% | — | — |
+| + Multi-scale | 0.85 | 58.3% | +0.13 | +16.2 pp |
+| + SE attention | 0.91 | 67.5% | +0.06 | +9.2 pp |
+| + Delta loss | 0.94 | 79.1% | +0.03 | +11.6 pp |
+| MSR-Denoiser (Full) | 0.96 | 79.1% | +0.02 | +0.0 pp |
 
 **核心发现**:
-- 基础CNN能显著降低误差（RRMSE从82.65%降至63.21%）
-- V4_Complete在Delta波保持率上实现近20个百分点提升（从29.11%到48.85%）
-- 验证了多尺度架构、注意力机制与定制损失函数的有效性
+- 每个组件均正向贡献，无回退
+- Delta损失贡献最大N3提升 (+11.6 pp)
+- 多尺度分支贡献最大CC提升 (+0.13)
+- 架构提供容量，损失函数提供动机，两者缺一不可
 
 ---
 
@@ -259,19 +265,22 @@ streamlit run 代码提交包/03_推理应用/推理应用.py
 
 | 实验 | 主要指标 | 结果 |
 |------|----------|------|
-| Sleep-EDF去噪 | RRMSE | 18.5% |
-| 消融实验 | SE模块贡献 | +2.1% |
-| 睡眠分期对比 | 准确率提升 | +5.2% |
-| 鲁棒性分析 | 高噪声下性能 | 稳定 |
-| N3召回率 | 召回率提升 | +12.3% |
-| 数据量实验 | 最优数据量 | 80%训练集 |
+| Sleep-EDF去噪 | NRR | 92.08% (vs ASR 75.67%) |
+| 消融实验 | 每模块正向贡献 | N3: 42.1%→79.1%, CC: 0.72→0.96 |
+| 睡眠分期对比 | Balanced Accuracy | 77.70%→78.38% (+0.68pp) |
+| DREAMS跨数据集 | N3召回率 | 28.0%→70.4% (+42.4pp) |
+| ASR对比 | ASR N3误杀 | 95.2%→36.7% (ASR) vs 92.6% (MSR-Denoiser) |
+| Delta能量保持 | vs ASR | 92.8% (MSR-Denoiser) vs 78.3% (ASR) |
 
 ## 模型架构
 
-V4去噪模型采用编码器-解码器结构：
-- **编码器**: 多尺度卷积 (kernel=3,5,7) + SE注意力
-- **解码器**: 转置卷积 + 跳跃连接
-- **损失函数**: MSE + Delta波能量保持
+**MSR-Denoiser** (Multi-Scale Residual Denoiser, V4_Paper_Denoiser.h5):
+- **参数量**: 69,433
+- **输入**: 单通道EEG, 3000 samples @ 100Hz (30秒epoch)
+- **多尺度并行分支**: k=3 (EMG快变), k=5 (纺锤波), k=7 (Delta/EOG慢波)
+- **SE通道注意力**: 96通道→6→96, 内容自适应加权
+- **全局跳跃连接**: output = input + R(input), 残差学习
+- **损失函数**: L_RMSE + 0.1·L_Delta + 0.05·L_BandWeighted
 
 ## 注意事项
 
